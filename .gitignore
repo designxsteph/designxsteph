@@ -404,6 +404,8 @@ ASALocalRun/
 # Local History for Visual Studio
 .localhistory/
 
-# Minified JS and CSS Files
-*.min.js
-*.min.css
+# Files Generated on Build
+*.*.js
+*.*.*.js
+**/wwwroot/css/
+**/wwwroot/fonts/

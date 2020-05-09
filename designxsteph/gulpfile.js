@@ -1,63 +1,23 @@
 'use strict';
 
-var gulp = require('gulp'),
+const gulp = require('gulp'),
     concat = require('gulp-concat'),
-    cssmin = require('gulp-cssmin'),
-    htmlmin = require('gulp-htmlmin'),
-    uglify = require('gulp-uglify'),
+    cleancss = require('gulp-clean-css'),
+    uglify = require('gulp-uglify-es').default,
+    sass = require('gulp-sass'),
+    clean = require('gulp-clean'),
+    purgecss = require('gulp-purgecss'),
+    rename = require('gulp-rename'),
     merge = require('merge-stream'),
-    del = require('del'),
     bundleconfig = require('./bundleconfig.json');
+
+const { series, parallel, src, dest, watch } = require('gulp');
+sass.compiler = require('node-sass');
 
 const regex = {
     css: /\.css$/,
-    html: /\.(html|htm)$/,
     js: /\.js$/
 };
-
-gulp.task('min:js', async function () {
-    merge(getBundles(regex.js).map(bundle => {
-        return gulp.src(bundle.inputFiles, { base: '.' })
-            .pipe(concat(bundle.outputFileName))
-            .pipe(uglify())
-            .pipe(gulp.dest('.'));
-    }))
-});
-
-gulp.task('min:css', async function () {
-    merge(getBundles(regex.css).map(bundle => {
-        return gulp.src(bundle.inputFiles, { base: '.' })
-            .pipe(concat(bundle.outputFileName))
-            .pipe(cssmin())
-            .pipe(gulp.dest('.'));
-    }))
-});
-
-gulp.task('min:html', async function () {
-    merge(getBundles(regex.html).map(bundle => {
-        return gulp.src(bundle.inputFiles, { base: '.' })
-            .pipe(concat(bundle.outputFileName))
-            .pipe(htmlmin({ collapseWhitespace: true, minifyCSS: true, minifyJS: true }))
-            .pipe(gulp.dest('.'));
-    }))
-});
-
-gulp.task('min', gulp.series(['min:js', 'min:css', 'min:html']));
-
-gulp.task('clean', () => {
-    return del(bundleconfig.map(bundle => bundle.outputFileName));
-});
-
-gulp.task('watch', () => {
-    getBundles(regex.js).forEach(
-        bundle => gulp.watch(bundle.inputFiles, gulp.series(["min:js"])));
-
-    getBundles(regex.css).forEach(
-        bundle => gulp.watch(bundle.inputFiles, gulp.series(["min:css"])));
-
-    getBundles(regex.html).forEach(
-        bundle => gulp.watch(bundle.inputFiles, gulp.series(['min:html'])));
-});
 
 const getBundles = (regexPattern) => {
     return bundleconfig.filter(bundle => {
@@ -65,4 +25,90 @@ const getBundles = (regexPattern) => {
     });
 };
 
-gulp.task('default', gulp.series("min"));
+function del() {
+    return src(['wwwroot/js/*.*.js', 'wwwroot/css', 'wwwroot/fonts'], { allowEmpty: true })
+        .pipe(clean({ force: true }));
+}
+
+function copyFonts() {
+    return src('node_modules/@fortawesome/fontawesome-free/webfonts/*.*')
+        .pipe(dest('wwwroot/fonts/fontawesome-free'));
+}
+
+function compileSass() {
+    return src('wwwroot/scss/*.scss')
+        .pipe(sass().on('error', sass.logError))
+        .pipe(dest('wwwroot/css'));
+}
+
+function compileJs() {
+    var tasks = getBundles(regex.js).map(function (bundle) {
+
+        return gulp.src(bundle.inputFiles, { base: '.' })
+            .pipe(concat(bundle.outputFileName))
+            .pipe(dest('.'));
+    });
+
+    return merge(tasks);
+}
+
+function compileCss() {
+    var tasks = getBundles(regex.css).map(function (bundle) {
+
+        return gulp.src(bundle.inputFiles, { base: '.' })
+            .pipe(concat(bundle.outputFileName))
+            .pipe(purgecss({
+                content: ['Pages/**/*.cshtml', 'wwwroot/js/*.bundle.js']
+            }))
+            .pipe(gulp.dest('.'));
+    });
+
+    return merge(tasks);
+}
+
+function minCss() {
+    var tasks = getBundles(regex.css).map(function (bundle) {
+
+        return gulp.src(bundle.outputFileName, { base: '.' })
+            .pipe(cleancss({
+                level: 2,
+                compatibility: 'ie8'
+            }))
+            .pipe(rename({ suffix: '.min' }))
+            .pipe(gulp.dest('.'));
+    });
+
+    return merge(tasks);
+}
+
+function minJs() {
+    var tasks = getBundles(regex.js).map(function (bundle) {
+
+        return gulp.src(bundle.outputFileName, { base: '.' })
+            .pipe(uglify())
+            .pipe(rename({ suffix: '.min' }))
+            .pipe(dest('.'));
+    });
+
+    return merge(tasks);
+}
+
+// Independednt tasks
+exports.del = del;
+exports.copyFonts = copyFonts;
+exports.compileSass = compileSass;
+exports.compileJs = compileJs;
+exports.minCss = minCss;
+exports.minJs = minJs;
+
+// Gulp series
+exports.compileSassJs = parallel(compileSass, compileJs);
+exports.minCssJs = parallel(minCss, minJs);
+
+// Gulp default
+exports.default = series(del, copyFonts, exports.compileSassJs, compileCss, exports.minCssJs);
+
+// Watch files
+exports.watchFiles = function () {
+    watch(['wwwroot/scss/*.scss', 'wwwroot/js/site.js', 'wwwroot/lib/'], exports.default);
+};

@@ -1,19 +1,18 @@
 [
   {
-    "outputFileName": "wwwroot/css/site.min.css",
+    "outputFileName": "wwwroot/css/site.bundle.css",
     "inputFiles": [
       "wwwroot/css/site.css"
     ]
   },
   {
-    "outputFileName": "wwwroot/js/site.min.js",
+    "outputFileName": "wwwroot/js/site.bundle.js",
     "inputFiles": [
+      "node_modules/jquery/dist/jquery.js",
+      "node_modules/jquery-validation/dist/jquery.validate.js",
+      "wwwroot/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.js",
+      "node_modules/bootstrap/dist/js/bootstrap.bundle.js",
       "wwwroot/js/site.js"
-    ],
-    "minify": {
-      "enabled": true,
-      "renameLocals": true
-    },
-    "sourceMap": false
+    ]
   }
 ]
